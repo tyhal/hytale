@@ -1,0 +1,8 @@
+go.work.sum
+go.work
+
+# until anything useful is in dev setup
+.idea/
+
+# until anything useful supports containers
+img/*
