@@ -12,6 +12,7 @@ import (
 func cmdRun() *cobra.Command {
 	var worldPath string
 	var serverOpts flop.With[server.Options]
+	var update bool
 
 	cmd := &cobra.Command{
 		Use: "run",
@@ -21,10 +22,12 @@ func cmdRun() *cobra.Command {
 				fmt.Println(err)
 				return
 			}
-			err = hytaleDownloader.Update()
-			if err != nil {
-				fmt.Println(err)
-				return
+			if update {
+				err = hytaleDownloader.Update()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
 			}
 			err = server.RunServer(
 				hytaleDownloader.GameJarPath(),
@@ -40,6 +43,8 @@ func cmdRun() *cobra.Command {
 
 	cmd.Flags().StringVar(&worldPath, "world", "", "Path to world")
 	cmd.MarkFlagRequired("world")
+
+	cmd.Flags().BoolVar(&update, "update", false, "Update Hytale server")
 
 	cmd.Flags().Bool("ipv6", false, "Enable IPv6 support")
 	serverOpts = append(serverOpts, flop.Toggle("ipv6", server.WithIPv6))

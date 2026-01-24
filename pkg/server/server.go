@@ -85,7 +85,6 @@ func RunServer(
 		"-XX:MaxRAMPercentage=90.0",
 		"-XX:+UseG1GC",                // Newer GC
 		"-XX:+UseStringDeduplication", // Feature of G1GC
-		"-Xshare:on",
 		fmt.Sprintf("-XX:AOTCache=%s", aotPath),
 	}
 	if serverOpts.javaFlags != nil && len(serverOpts.javaFlags) > 0 {
