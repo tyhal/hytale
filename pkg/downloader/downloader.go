@@ -13,8 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-
-	"github.com/charmbracelet/log"
 )
 
 var url = "https://downloader.hytale.com/hytale-downloader.zip"
@@ -23,11 +21,13 @@ type Downloader interface {
 	// Update downloads the latest version of the game assets
 	Update() error
 	GameJarPath() GameJarPath
+	GameAotPath() GameAotPath
 	GameAssetsPath() GameAssetsPath
 }
 
 type GameJarPath string
 type GameAssetsPath string
+type GameAotPath string
 
 type downloader struct {
 	downloaderDir     string
@@ -37,6 +37,10 @@ type downloader struct {
 
 func (d downloader) GameJarPath() GameJarPath {
 	return GameJarPath(filepath.Join(d.gameServerPath, "Server", "HytaleServer.jar"))
+}
+
+func (d downloader) GameAotPath() GameAotPath {
+	return GameAotPath(filepath.Join(d.gameServerPath, "Server", "HytaleServer.aot"))
 }
 
 func (d downloader) GameAssetsPath() GameAssetsPath {
@@ -55,7 +59,7 @@ func New() (Downloader, error) {
 	return &downloader{
 		// TODO think of a unique name to store various config
 		downloaderDir:     filepath.Join(configDir, "tyhal", "hytale", "downloader"),
-		gameAssetsZipPath: filepath.Join(configDir, "tyhal", "hytale", "assets.zip"),
+		gameAssetsZipPath: filepath.Join(configDir, "tyhal", "hytale", "server.zip"),
 		gameServerPath:    filepath.Join(configDir, "tyhal", "hytale", "server"), // Assets.zip, Hytale.jar
 	}, nil
 }
@@ -69,6 +73,9 @@ func (d *downloader) downloaderBinaryPath() (string, error) {
 		executable = "hytale-downloader-windows-amd64.exe"
 	case "linuxamd64":
 		executable = "hytale-downloader-linux-amd64"
+	// with emulation
+	case "linuxarm64":
+		executable = "hytale-downloader-linux-amd64"
 	default:
 		return "", fmt.Errorf("unsupported platform: %s/%s", systemOs, systemArch)
 	}
@@ -77,13 +84,13 @@ func (d *downloader) downloaderBinaryPath() (string, error) {
 
 func logCleanup(err error) {
 	if err != nil {
-		log.Warn(err)
+		////log.Warn(err)
 	}
 }
 
 func extract(z *zip.Reader, outpath string) error {
 
-	log.Infof("Extracting %s\n", outpath)
+	////log.Infof("Extracting %s\n", outpath)
 	for _, f := range z.File {
 		fpath := filepath.Join(outpath, f.Name)
 
@@ -126,7 +133,7 @@ func (d downloader) downloadDownloader() error {
 		return err
 	}
 	defer func() { logCleanup(resp.Body.Close()) }()
-	log.Info("Downloading")
+	//log.Info("Downloading")
 
 	b, _ := io.ReadAll(resp.Body)
 	br := bytes.NewReader(b)
@@ -146,7 +153,7 @@ func (d *downloader) ensureDownloader() (string, error) {
 	if _, err := os.Stat(downloaderBin); os.IsNotExist(err) {
 		return downloaderBin, d.downloadDownloader()
 	}
-	log.Info("Checking for downloader updates")
+	//log.Info("Checking for downloader updates")
 	cmd := exec.Command(downloaderBin, "-check-update")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -158,7 +165,6 @@ func (d *downloader) Update() error {
 	if err != nil {
 		return err
 	}
-	log.Info("Downloading game assets")
 
 	cmd := exec.Command(downloaderBin, "-download-path", d.gameAssetsZipPath)
 	cmd.Stdout = os.Stdout

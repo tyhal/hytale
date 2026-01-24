@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/log"
-	"github.com/spf13/cobra"
 	"github.com/tyhal/hytale/pkg/auth"
 )
 
-func basicAuthFlow(cmd *cobra.Command, args []string) {
+func main() {
 	deviceCode, err := auth.RequestDeviceCode()
 	if err != nil {
 		log.Errorf("RequestDeviceCode: %v\n", err)
@@ -34,7 +33,6 @@ func basicAuthFlow(cmd *cobra.Command, args []string) {
 		log.Errorf("CreateGameSession: %v\n", err)
 		return
 	}
-	fmt.Println(session.SessionToken)
-	fmt.Println(session.IdentityToken)
 	fmt.Println(profiles.Owner)
+	fmt.Println(session)
 }

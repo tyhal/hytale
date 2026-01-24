@@ -9,7 +9,7 @@ import (
 	"github.com/tyhal/hytale/pkg/downloader"
 )
 
-type ServerOption func(*serverOptions)
+type Options func(*serverOptions)
 type serverOptions struct {
 	backups      string
 	sessionToken auth.SessionToken
@@ -20,49 +20,49 @@ type serverOptions struct {
 	javaFlags    []string
 }
 
-func WithBackups(backups string) ServerOption {
+func WithBackups(backups string) Options {
 	return func(opts *serverOptions) {
 		opts.backups = backups
 	}
 }
 
-func WithSessionToken(token auth.SessionToken) ServerOption {
+func WithSessionToken(token auth.SessionToken) Options {
 	return func(opts *serverOptions) {
 		opts.sessionToken = token
 	}
 }
 
-func WithIdentityToken(token auth.IdentityToken) ServerOption {
+func WithIdentityToken(token auth.IdentityToken) Options {
 	return func(opts *serverOptions) {
 		opts.idToken = token
 	}
 }
 
-func WithOwner(owner auth.OwnerUUID) ServerOption {
+func WithOwner(owner auth.OwnerUUID) Options {
 	return func(opts *serverOptions) {
 		opts.owner = owner
 	}
 }
 
-func WithIPv6() ServerOption {
+func WithIPv6() Options {
 	return func(opts *serverOptions) {
 		opts.ipv6 = true
 	}
 }
 
-func WithJavaFlags(flags ...string) ServerOption {
+func WithJavaFlags(flags ...string) Options {
 	return func(opts *serverOptions) {
 		opts.javaFlags = append(opts.javaFlags, flags...)
 	}
 }
 
-func WithExitOnOOM() ServerOption {
+func WithExitOnOOM() Options {
 	return func(opts *serverOptions) {
 		opts.javaFlags = append(opts.javaFlags, "-XX:+ExitOnOutOfMemoryError")
 	}
 }
 
-func WithDryRun() ServerOption {
+func WithDryRun() Options {
 	return func(opts *serverOptions) {
 		opts.dryRun = true
 	}
@@ -71,8 +71,9 @@ func WithDryRun() ServerOption {
 func RunServer(
 	serverPath downloader.GameJarPath,
 	assetsPath downloader.GameAssetsPath,
+	aotPath downloader.GameAotPath,
 	worldPath string,
-	opts ...ServerOption,
+	opts ...Options,
 ) error {
 	serverOpts := serverOptions{}
 	for _, opt := range opts {
@@ -81,10 +82,11 @@ func RunServer(
 
 	// Java args
 	args := []string{
-		"-XX:MaxRAMPercentage=75.0",   // Safe default
+		"-XX:MaxRAMPercentage=90.0",
 		"-XX:+UseG1GC",                // Newer GC
 		"-XX:+UseStringDeduplication", // Feature of G1GC
 		"-Xshare:on",
+		fmt.Sprintf("-XX:AOTCache=%s", aotPath),
 	}
 	if serverOpts.javaFlags != nil && len(serverOpts.javaFlags) > 0 {
 		args = append(args, serverOpts.javaFlags...)

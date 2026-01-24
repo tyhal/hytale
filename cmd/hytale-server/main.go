@@ -19,5 +19,7 @@ func main() {
 }
 
 func rootCmd() *cobra.Command {
-	return &cobra.Command{Use: "hytale-server"}
+	cmd := &cobra.Command{Use: "hytale-server"}
+	cmd.AddCommand(cmdRun())
+	return cmd
 }
