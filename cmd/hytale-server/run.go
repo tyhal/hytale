@@ -29,6 +29,7 @@ func cmdRun() *cobra.Command {
 					return
 				}
 			}
+			// TODO replicate catching Update error code and do an update
 			err = server.RunServer(
 				hytaleDownloader.GameJarPath(),
 				hytaleDownloader.GameAssetsPath(),
