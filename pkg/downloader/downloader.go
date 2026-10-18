@@ -1,6 +1,3 @@
-// Package downloader relates to usage of https://downloader.hytale.com/hytale-downloader.zip
-// TODO create a second implementation purely in Go
-// but still keep around the downloader from hytale themselves that only supports certain OS and Arch
 package downloader
 
 import (
@@ -13,27 +10,35 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/tyhal/hytale/pkg/auth"
 )
 
-var url = "https://downloader.hytale.com/hytale-downloader.zip"
+const defaultDownloaderURL = "https://downloader.hytale.com/hytale-downloader.zip"
 
 type Downloader interface {
-	// Update downloads the latest version of the game assets
 	Update() error
+	BuildAOTCache() error
 	GameJarPath() GameJarPath
 	GameAotPath() GameAotPath
 	GameAssetsPath() GameAssetsPath
 }
 
-type GameJarPath string
-type GameAssetsPath string
-type GameAotPath string
+type (
+	GameJarPath    string
+	GameAssetsPath string
+	GameAotPath    string
+)
 
 type downloader struct {
 	downloaderDir     string
 	gameAssetsZipPath string
 	gameServerPath    string
+	credentialsPath   string
+	allowAOTFail      bool
 }
+
+var _ Downloader = (*downloader)(nil)
 
 func (d downloader) GameJarPath() GameJarPath {
 	return GameJarPath(filepath.Join(d.gameServerPath, "Server", "HytaleServer.jar"))
@@ -47,130 +52,122 @@ func (d downloader) GameAssetsPath() GameAssetsPath {
 	return GameAssetsPath(filepath.Join(d.gameServerPath, "Assets.zip"))
 }
 
-// Ensure downloader implements Downloader
-var _ Downloader = (*downloader)(nil)
-
-// New creates a downloader with defaults
-func New() (Downloader, error) {
+func New(opts ...Options) (Downloader, error) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	return &downloader{
-		// TODO think of a unique name to store various config
-		downloaderDir:     filepath.Join(configDir, "tyhal", "hytale", "downloader"),
-		gameAssetsZipPath: filepath.Join(configDir, "tyhal", "hytale", "server.zip"),
-		gameServerPath:    filepath.Join(configDir, "tyhal", "hytale", "server"), // Assets.zip, Hytale.jar
-	}, nil
+	base := filepath.Join(configDir, "tyhal", "hytale")
+	credsPath, err := auth.DefaultDownloaderAuthFilePath()
+	if err != nil {
+		credsPath = filepath.Join(base, "downloader.json")
+	}
+	d := &downloader{
+		downloaderDir:     filepath.Join(base, "downloader"),
+		gameAssetsZipPath: filepath.Join(base, "server.zip"),
+		gameServerPath:    filepath.Join(base, "server"),
+		credentialsPath:   credsPath,
+	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d, nil
 }
 
 func (d *downloader) downloaderBinaryPath() (string, error) {
-	systemOs := runtime.GOOS
-	systemArch := runtime.GOARCH
-	var executable string
-	switch systemOs + systemArch {
-	case "windowsamd64":
-		executable = "hytale-downloader-windows-amd64.exe"
-	case "linuxamd64":
-		executable = "hytale-downloader-linux-amd64"
-	// with emulation
-	case "linuxarm64":
-		executable = "hytale-downloader-linux-amd64"
+	switch runtime.GOOS {
+	case "windows":
+		return filepath.Join(d.downloaderDir, "hytale-downloader-windows-amd64.exe"), nil
+	case "linux":
+		return filepath.Join(d.downloaderDir, "hytale-downloader-linux-amd64"), nil
 	default:
-		return "", fmt.Errorf("unsupported platform: %s/%s", systemOs, systemArch)
+		return "", fmt.Errorf("unsupported platform: %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-	return filepath.Join(d.downloaderDir, executable), nil
 }
 
-func logCleanup(err error) {
+func (d *downloader) ensureDownloader() (string, error) {
+	binPath, err := d.downloaderBinaryPath()
 	if err != nil {
-		////log.Warn(err)
+		return "", err
 	}
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		if err := d.downloadDownloader(); err != nil {
+			return "", err
+		}
+	}
+	return binPath, nil
 }
 
-func extract(z *zip.Reader, outpath string) error {
+func (d *downloader) downloadDownloader() error {
+	resp, err := http.Get(defaultDownloaderURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-	////log.Infof("Extracting %s\n", outpath)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	z, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return err
+	}
+	return extractZip(z, d.downloaderDir)
+}
+
+func extractZip(z *zip.Reader, destDir string) error {
 	for _, f := range z.File {
-		fpath := filepath.Join(outpath, f.Name)
-
+		target := filepath.Join(destDir, f.Name)
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
 			continue
 		}
-
-		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			return err
 		}
-
-		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return err
 		}
-
 		rc, err := f.Open()
 		if err != nil {
 			outFile.Close()
 			return err
 		}
-
 		_, err = io.Copy(outFile, rc)
 		outFile.Close()
 		rc.Close()
-
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-// downloadDownloader downloads the downloader so you can download the downloads
-func (d downloader) downloadDownloader() error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer func() { logCleanup(resp.Body.Close()) }()
-	//log.Info("Downloading")
-
-	b, _ := io.ReadAll(resp.Body)
-	br := bytes.NewReader(b)
-	z, err := zip.NewReader(br, int64(len(b)))
-	if err != nil {
-		return err
-	}
-
-	return extract(z, d.downloaderDir)
-}
-
-func (d *downloader) ensureDownloader() (string, error) {
-	downloaderBin, err := d.downloaderBinaryPath()
-	if err != nil {
-		return "", err
-	}
-	if _, err := os.Stat(downloaderBin); os.IsNotExist(err) {
-		return downloaderBin, d.downloadDownloader()
-	}
-	//log.Info("Checking for downloader updates")
-	cmd := exec.Command(downloaderBin, "-check-update")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return downloaderBin, cmd.Run()
-}
-
 func (d *downloader) Update() error {
-	downloaderBin, err := d.ensureDownloader()
+	bin, err := d.ensureDownloader()
 	if err != nil {
 		return err
 	}
 
-	cmd := exec.Command(downloaderBin, "-download-path", d.gameAssetsZipPath)
+	if d.credentialsPath != "" {
+		if _, err := auth.EnsureDownloaderAuth(d.credentialsPath); err != nil {
+			return fmt.Errorf("failed to authenticate downloader: %w", err)
+		}
+	}
+
+	args := []string{"-download-path", d.gameAssetsZipPath}
+	if d.credentialsPath != "" {
+		args = append(args, "-credentials-path", d.credentialsPath)
+	}
+
+	cmd := exec.Command(bin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 
@@ -178,7 +175,40 @@ func (d *downloader) Update() error {
 	if err != nil {
 		return err
 	}
-	defer func() { logCleanup(z.Close()) }()
+	defer z.Close()
 
-	return extract(&z.Reader, d.gameServerPath)
+	if err := extractZip(&z.Reader, d.gameServerPath); err != nil {
+		return err
+	}
+
+	return d.BuildAOTCache()
+}
+
+func (d *downloader) BuildAOTCache() error {
+	aotConfig := filepath.Join(d.gameServerPath, "Server", "HytaleServer.aot.config")
+	aotCache := string(d.GameAotPath())
+	jarPath := string(d.GameJarPath())
+
+	if _, err := os.Stat(aotConfig); err != nil {
+		return nil
+	}
+
+	cmd := exec.Command("java",
+		"-Xlog:aot",
+		"-XX:AOTMode=create",
+		fmt.Sprintf("-XX:AOTConfiguration=%s", aotConfig),
+		fmt.Sprintf("-XX:AOTCache=%s", aotCache),
+		"-jar", jarPath,
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		_ = os.Remove(aotCache)
+		if d.allowAOTFail {
+			fmt.Printf("Warning: AOT cache generation failed (ignored): %v\n", err)
+			return nil
+		}
+		return fmt.Errorf("AOT cache generation failed: %w", err)
+	}
+	return nil
 }

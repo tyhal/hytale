@@ -21,5 +21,6 @@ func main() {
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "hytale-server"}
 	cmd.AddCommand(cmdRun())
+	cmd.AddCommand(cmdUpdate())
 	return cmd
 }

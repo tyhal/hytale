@@ -5,67 +5,43 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/tyhal/hytale/pkg/auth"
 	"github.com/tyhal/hytale/pkg/downloader"
 )
 
-type Options func(*serverOptions)
-type serverOptions struct {
-	backups      string
-	sessionToken auth.SessionToken
-	idToken      auth.IdentityToken
-	owner        auth.OwnerUUID
-	ipv6         bool
-	dryRun       bool
-	javaFlags    []string
-}
-
-func WithBackups(backups string) Options {
-	return func(opts *serverOptions) {
-		opts.backups = backups
+func buildJavaArgs(
+	serverPath downloader.GameJarPath,
+	assetsPath downloader.GameAssetsPath,
+	aotPath downloader.GameAotPath,
+	serverOpts serverOptions,
+) []string {
+	args := []string{
+		"-XX:MaxRAMPercentage=80.0",
+		"-XX:+UseG1GC",
+		"-XX:+UseStringDeduplication",
 	}
-}
-
-func WithSessionToken(token auth.SessionToken) Options {
-	return func(opts *serverOptions) {
-		opts.sessionToken = token
+	if aotPath != "" {
+		if _, err := os.Stat(string(aotPath)); err == nil {
+			args = append(args, fmt.Sprintf("-XX:AOTCache=%s", aotPath))
+		}
 	}
-}
-
-func WithIdentityToken(token auth.IdentityToken) Options {
-	return func(opts *serverOptions) {
-		opts.idToken = token
+	if len(serverOpts.javaFlags) > 0 {
+		args = append(args, serverOpts.javaFlags...)
 	}
-}
-
-func WithOwner(owner auth.OwnerUUID) Options {
-	return func(opts *serverOptions) {
-		opts.owner = owner
+	if serverOpts.ipv6 {
+		args = append(args, "-Djava.net.preferIPv6Addresses=true")
 	}
-}
+	args = append(args, "-jar", string(serverPath), "--assets", string(assetsPath))
 
-func WithIPv6() Options {
-	return func(opts *serverOptions) {
-		opts.ipv6 = true
+	if serverOpts.backups != "" {
+		args = append(args, "--backup", "--backup-dir", serverOpts.backups)
 	}
-}
-
-func WithJavaFlags(flags ...string) Options {
-	return func(opts *serverOptions) {
-		opts.javaFlags = append(opts.javaFlags, flags...)
+	if serverOpts.sessionToken != "" {
+		args = append(args, "--session-token", string(serverOpts.sessionToken))
 	}
-}
-
-func WithExitOnOOM() Options {
-	return func(opts *serverOptions) {
-		opts.javaFlags = append(opts.javaFlags, "-XX:+ExitOnOutOfMemoryError")
+	if serverOpts.idToken != "" {
+		args = append(args, "--identity-token", string(serverOpts.idToken))
 	}
-}
-
-func WithDryRun() Options {
-	return func(opts *serverOptions) {
-		opts.dryRun = true
-	}
+	return args
 }
 
 func RunServer(
@@ -75,47 +51,23 @@ func RunServer(
 	worldPath string,
 	opts ...Options,
 ) error {
-	serverOpts := serverOptions{}
+	var serverOpts serverOptions
 	for _, opt := range opts {
 		opt(&serverOpts)
 	}
 
-	// Java args
-	args := []string{
-		"-XX:MaxRAMPercentage=90.0",
-		"-XX:+UseG1GC",                // Newer GC
-		"-XX:+UseStringDeduplication", // Feature of G1GC
-		fmt.Sprintf("-XX:AOTCache=%s", aotPath),
-	}
-	if serverOpts.javaFlags != nil && len(serverOpts.javaFlags) > 0 {
-		args = append(args, serverOpts.javaFlags...)
-	}
-	if serverOpts.ipv6 {
-		args = append(args, "-Djava.net.preferIPv6Addresses=true")
-	}
-	args = append(args, "-jar", string(serverPath))
-
-	// Server args
-	args = append(args, "--assets", string(assetsPath))
-	if serverOpts.backups != "" {
-		args = append(args, "--backup", "--backup-dir", serverOpts.backups)
-	}
-	if serverOpts.sessionToken != "" {
-		args = append(args, "--session-token", serverOpts.sessionToken)
-	}
-	if serverOpts.idToken != "" {
-		args = append(args, "--identity-token", serverOpts.idToken)
-	}
-	if serverOpts.owner != "" {
-		args = append(args, "--owner-uuid", serverOpts.owner)
+	if serverOpts.enableService {
+		return EnableService(serverPath, assetsPath, aotPath, worldPath, opts...)
 	}
 
+	args := buildJavaArgs(serverPath, assetsPath, aotPath, serverOpts)
 	cmd := exec.Command("java", args...)
 	cmd.Dir = worldPath
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if serverOpts.dryRun {
+
+	if !serverOpts.exec {
 		fmt.Println(cmd.String())
 		return nil
 	}
