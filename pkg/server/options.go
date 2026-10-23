@@ -11,10 +11,10 @@ type serverOptions struct {
 	sessionToken  auth.SessionToken
 	idToken       auth.IdentityToken
 	owner         auth.OwnerUUID
-	ipv6          bool
-	exec          bool
-	enableService bool
-	javaFlags     []string
+	ipv6         bool
+	exec         bool
+	service      bool
+	javaFlags    []string
 }
 
 func WithBackups(backups string) Options {
@@ -65,8 +65,8 @@ func WithExec() Options {
 	}
 }
 
-func WithEnableService() Options {
+func WithService() Options {
 	return func(opts *serverOptions) {
-		opts.enableService = true
+		opts.service = true
 	}
 }

@@ -39,7 +39,7 @@ flowchart TD
     CheckFiles -- Yes --> BuildArgs["Assemble Java & Server Arguments"]
 
     BuildArgs --> CheckMode{"Execution Mode"}
-    CheckMode -- "--enable-service" --> SystemdMode["Render /etc/systemd/system/hytale.service<br/>systemctl daemon-reload<br/>systemctl enable & restart hytale.service<br/>Verify Health Check"]
+    CheckMode -- "--service" --> SystemdMode["Render /etc/systemd/system/hytale.service<br/>systemctl daemon-reload<br/>systemctl enable & restart hytale.service<br/>Verify Health Check"]
     CheckMode -- "--exec" --> ExecMode["Execute Java Process in Foreground<br/>(stdin/stdout/stderr attached)"]
     CheckMode -- Default (Dry-run) --> PrintCmd["Print Assembled Java Command to stdout"]
 
@@ -56,7 +56,7 @@ flowchart TD
 | `--ipv6` | bool | Configures JVM socket options for IPv6 networking (`-Djava.net.preferIPv6Addresses=true`). |
 | `--backup-path` | string | Enables automated world backups to the specified directory. |
 | `--exec` | bool | Runs the server directly in the foreground. |
-| `--enable-service` | bool | Provisions `/etc/systemd/system/hytale.service`, starts it, and verifies unit health. |
+| `--service` | bool | Provisions `/etc/systemd/system/hytale.service`, starts it, and verifies unit health. |
 
 #### `hytale-auth`
 Standalone CLI utility to inspect current authentication tokens, verify session expiration, or manually perform the interactive OAuth login flow.

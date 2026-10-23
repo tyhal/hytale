@@ -69,8 +69,8 @@ func cmdRun() *cobra.Command {
 	cmd.Flags().Bool("exec", false, "Run server directly once-off in foreground")
 	serverOpts = append(serverOpts, flop.Toggle("exec", server.WithExec))
 
-	cmd.Flags().Bool("enable-service", false, "Configure systemd service, enable and start it, and verify health")
-	serverOpts = append(serverOpts, flop.Toggle("enable-service", server.WithEnableService))
+	cmd.Flags().Bool("service", false, "Configure systemd service, enable and start it, and verify health")
+	serverOpts = append(serverOpts, flop.Toggle("service", server.WithService))
 
 	cmd.Flags().String("backup-path", "", "Path to backup directory")
 	serverOpts = append(serverOpts, flop.String("backup-path", server.WithBackups))

@@ -81,7 +81,7 @@ func TestOptions(t *testing.T) {
 		WithJavaFlags("-XX:+PrintGC"),
 		WithExitOnOOM(),
 		WithExec(),
-		WithEnableService(),
+		WithService(),
 	}
 
 	for _, opt := range optionsList {
@@ -106,8 +106,8 @@ func TestOptions(t *testing.T) {
 	if !opts.exec {
 		t.Errorf("expected exec true")
 	}
-	if !opts.enableService {
-		t.Errorf("expected enableService true")
+	if !opts.service {
+		t.Errorf("expected service true")
 	}
 	if len(opts.javaFlags) != 2 || opts.javaFlags[0] != "-XX:+PrintGC" || opts.javaFlags[1] != "-XX:+ExitOnOutOfMemoryError" {
 		t.Errorf("unexpected javaFlags: %v", opts.javaFlags)

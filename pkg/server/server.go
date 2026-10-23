@@ -56,7 +56,7 @@ func RunServer(
 		opt(&serverOpts)
 	}
 
-	if serverOpts.enableService {
+	if serverOpts.service {
 		return EnableService(serverPath, assetsPath, aotPath, worldPath, opts...)
 	}
 
