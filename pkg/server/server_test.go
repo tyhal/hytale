@@ -61,12 +61,50 @@ func TestRenderUnitFile(t *testing.T) {
 		t.Errorf("missing WorkingDirectory in rendered unit: %s", rendered)
 	}
 
-	if !strings.Contains(rendered, "ExecStart=/usr/bin/java -jar /opt/hytale/HytaleServer.jar") {
+	if !strings.Contains(rendered, "ExecStart=/bin/sh -c 'mkdir -p /run/hytale && [ -p /run/hytale/stdin.fifo ] || mkfifo /run/hytale/stdin.fifo; exec /usr/bin/java -jar /opt/hytale/HytaleServer.jar 0<> /run/hytale/stdin.fifo'") {
 		t.Errorf("missing ExecStart in rendered unit: %s", rendered)
+	}
+
+	if !strings.Contains(rendered, "RuntimeDirectory=hytale") {
+		t.Errorf("missing RuntimeDirectory in rendered unit: %s", rendered)
+	}
+
+	if !strings.Contains(rendered, "KillSignal=SIGTERM") || !strings.Contains(rendered, "TimeoutStopSec=120") {
+		t.Errorf("missing graceful shutdown parameters in rendered unit: %s", rendered)
+	}
+
+	if !strings.Contains(rendered, "ExecStop=/usr/local/bin/hytale-stop.sh") {
+		t.Errorf("missing ExecStop in rendered unit: %s", rendered)
+	}
+
+	if !strings.Contains(rendered, "Restart=on-failure") {
+		t.Errorf("missing Restart=on-failure in rendered unit: %s", rendered)
 	}
 
 	if !strings.Contains(rendered, "[Unit]") || !strings.Contains(rendered, "[Service]") || !strings.Contains(rendered, "[Install]") {
 		t.Errorf("missing standard systemd sections in rendered unit: %s", rendered)
+	}
+}
+
+func TestStopScriptContent(t *testing.T) {
+	expectedSubstrings := []string{
+		"say [Server] Server shutting down in 60 seconds...",
+		"say [Server] Server shutting down in 30 seconds...",
+		"say [Server] Server shutting down in 10 seconds...",
+		"say [Server] World backup initiated...",
+		"backup",
+		"stop",
+	}
+
+	lastIdx := -1
+	for _, substr := range expectedSubstrings {
+		idx := strings.Index(stopScriptContent, substr)
+		if idx == -1 {
+			t.Errorf("expected %q in stopScriptContent, got: %s", substr, stopScriptContent)
+		} else if idx < lastIdx {
+			t.Errorf("expected %q to appear after previous substring in stopScriptContent", substr)
+		}
+		lastIdx = idx
 	}
 }
 

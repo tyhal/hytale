@@ -5,9 +5,14 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory={{ .WorkingDirectory }}
-ExecStart={{ .ExecStart }}
-Restart=always
+RuntimeDirectory=hytale
+ExecStart=/bin/sh -c 'mkdir -p /run/hytale && [ -p /run/hytale/stdin.fifo ] || mkfifo /run/hytale/stdin.fifo; exec {{ .ExecStart }} 0<> /run/hytale/stdin.fifo'
+ExecStop=/usr/local/bin/hytale-stop.sh
+Restart=on-failure
 RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=120
+SendSIGKILL=yes
 StandardOutput=journal
 StandardError=journal
 LimitNOFILE=65535

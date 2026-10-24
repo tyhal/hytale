@@ -18,6 +18,9 @@ import (
 //go:embed hytale.service.tmpl
 var serviceTemplateContent string
 
+//go:embed hytale-stop.sh
+var stopScriptContent string
+
 var serviceTemplate = template.Must(template.New("hytale.service").Parse(serviceTemplateContent))
 
 type serviceTemplateData struct {
@@ -77,6 +80,20 @@ func EnableService(
 	unitContent, err := renderUnitFile(absWorldPath, execStart)
 	if err != nil {
 		return err
+	}
+
+	const stopScriptPath = "/usr/local/bin/hytale-stop.sh"
+	if err := os.MkdirAll(filepath.Dir(stopScriptPath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", stopScriptPath, err)
+	}
+	if err := os.WriteFile(stopScriptPath, []byte(stopScriptContent), 0755); err != nil {
+		return fmt.Errorf("failed to write %s: %w", stopScriptPath, err)
+	}
+
+	const fifoPath = "/run/hytale/stdin.fifo"
+	_ = os.MkdirAll(filepath.Dir(fifoPath), 0755)
+	if _, err := os.Stat(fifoPath); os.IsNotExist(err) {
+		_ = exec.Command("mkfifo", fifoPath).Run()
 	}
 
 	const unitPath = "/etc/systemd/system/hytale.service"
