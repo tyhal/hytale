@@ -1,13 +1,11 @@
 module github.com/tyhal/hytale/cmd/hytale-server
 
-replace github.com/tyhal/hytale => ../..
-
 go 1.26.10
 
 require (
 	github.com/charmbracelet/fang v1.0.0
 	github.com/spf13/cobra v1.10.2
-	github.com/tyhal/hytale v0.0.0-20261018134453-bfd48bfec044
+	github.com/tyhal/hytale v0.0.0-20261024152701-34b894f3108c
 	github.com/tyhal/x v0.0.0-20260505200016-f5d2950278dc
 )
 

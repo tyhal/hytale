@@ -12,8 +12,8 @@ import (
 type AuthData struct {
 	TokenPollSuccess
 	Owner   OwnerUUID `json:"owner,omitempty"`
-	Profile Profile   `json:"profile,omitempty"`
-	Session Session   `json:"session,omitempty"`
+	Profile Profile   `json:"profile"`
+	Session Session   `json:"session"`
 }
 
 // Valid returns true if the AuthData has an active game session and access token.
@@ -161,7 +161,7 @@ type DownloaderCredentials struct {
 	AccessToken  AccessToken  `json:"access_token"`
 	TokenType    string       `json:"token_type,omitempty"`
 	RefreshToken RefreshToken `json:"refresh_token,omitempty"`
-	Expiry       time.Time    `json:"expiry,omitempty"`
+	Expiry       time.Time    `json:"expiry"`
 	ExpiresIn    int          `json:"expires_in,omitempty"`
 }
 
